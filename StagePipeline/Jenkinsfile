@@ -43,7 +43,7 @@ pipeline {
             }
         }
 
-        stage ('CODE ANALYSIS WITH CHECKSTYLE') {
+        stage('CODE ANALYSIS WITH CHECKSTYLE') {
             steps {
                 sh 'mvn -s settings.xml checkstyle:checkstyle'
             }
@@ -74,7 +74,8 @@ pipeline {
                 }
             }
         }
-        stage('upload artifact') {
+
+        stage('Upload Artifact') {
             steps {
                 nexusArtifactUploader(
                     nexusVersion: 'nexus3',
@@ -93,29 +94,30 @@ pipeline {
                 )
             }
         }
-            stage('Build App Image') {
-                steps {
-                    script {
-                        dockerImage = docker.build( appRegistry + ":$BUILD_NUMBER", "./Docker-files/app/multistage/")
 
+        stage('Build App Image') {
+            steps {
+                script {
+                    dockerImage = docker.build(appRegistry + ":$BUILD_NUMBER", "./Docker-files/app/multistage/")
+                }
+            }
+        }
+
+        stage('Upload App Image') {
+            steps {
+                script {
+                    docker.withRegistry(vprofileRegistry, registryCredential) {
+                        dockerImage.push("$BUILD_NUMBER")
+                        dockerImage.push('latest')
                     }
                 }
             }
-            stage('Upload App Image') {
-                steps {
-                    script {
-                        docker.withRegistry( vprofileRegistry, registryCredential ) {
-                            dockerImage.push("$BUILD_NUMBER")
-                            dockerImage.push('latest')
-                        }
-                    }
-                }
-            }
-            stage('Deploy to ecs staging') {
-                steps {
-                    withAWS(credentials: 'awscreds', region: 'ap-south-1') {
-                        sh 'aws ecs update-service --cluster ${cluster} --service ${service} --force-new-deployment'
-                    }
+        }
+
+        stage('Deploy to ECS Staging') {
+            steps {
+                withAWS(credentials: 'awscreds', region: 'ap-south-1') {
+                    sh 'aws ecs update-service --cluster ${cluster} --service ${service} --force-new-deployment'
                 }
             }
         }
